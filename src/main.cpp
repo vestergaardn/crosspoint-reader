@@ -23,12 +23,14 @@
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
+#include "ReadingStatsStore.h"
 #include "RecentBooksStore.h"
 #include "SdCardFontSystem.h"
 #include "activities/Activity.h"
 #include "activities/ActivityManager.h"
 #include "activities/settings/SdFirmwareUpdateActivity.h"
 #include "components/UITheme.h"
+#include "network/LibrarySync.h"
 #include "fontIds.h"
 #include "images/LoadingIcon.h"
 #include "util/ButtonNavigator.h"
@@ -350,6 +352,7 @@ void setup() {
   I18N.setLanguage(static_cast<Language>(SETTINGS.language));
   KOREADER_STORE.loadFromFile();
   OPDS_STORE.loadFromFile();
+  READING_STATS.loadFromFile();
   UITheme::getInstance().reload();
   ButtonNavigator::setMappedInputManager(mappedInputManager);
 
@@ -456,6 +459,16 @@ void setup() {
     APP_STATE.readerActivityLoadCount++;
     APP_STATE.saveToFile();
     activityManager.goToReader(path);
+  }
+
+  // Sync-on-wake: on a full (splash) boot, optionally pull new books + a home image from
+  // the user's computer before the routed activity takes over. Gated on a configured server
+  // URL and (by default) USB power, so it never slows a battery-powered wake. Best-effort:
+  // LibrarySync swallows all failures and boot always continues.
+  if (resume == BootResume::Splash && !recoveryFirmwareMode && !HalSystem::isRebootFromPanic() &&
+      SETTINGS.syncOnWake && SETTINGS.syncServerUrl[0] != '\0' &&
+      (!SETTINGS.syncOnlyWhenCharging || gpio.isUsbConnected())) {
+    LibrarySync::runAtBoot(renderer);
   }
 
   if (resume == BootResume::Silent) {

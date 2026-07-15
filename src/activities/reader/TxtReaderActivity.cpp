@@ -13,6 +13,7 @@
 #include "MappedInputManager.h"
 #include "ProgressFile.h"
 #include "ReaderUtils.h"
+#include "ReadingStatsStore.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -56,6 +57,7 @@ void TxtReaderActivity::onExit() {
   currentPageLines.clear();
   APP_STATE.readerActivityLoadCount = 0;
   APP_STATE.saveToFile();
+  READING_STATS.flush();  // persist pages-read counter once per session (also covers sleep)
   txt.reset();
 }
 
@@ -83,6 +85,7 @@ void TxtReaderActivity::loop() {
     requestUpdate();
   } else if (nextTriggered) {
     if (currentPage < totalPages - 1) {
+      READING_STATS.addPage();  // count every forward page turn (lifetime "pages read")
       currentPage++;
       requestUpdate();
     } else {

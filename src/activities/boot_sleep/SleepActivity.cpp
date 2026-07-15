@@ -8,8 +8,12 @@
 #include <Txt.h>
 #include <Xtc.h>
 
+#include <cstdint>
+#include <cstdio>
+
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "ReadingStatsStore.h"
 #include "activities/reader/ReaderUtils.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -44,6 +48,8 @@ void SleepActivity::onEnter() {
       return renderCustomSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER):
       return renderCoverSleepScreen();
+    case (CrossPointSettings::SLEEP_SCREEN_MODE::STATS):
+      return renderStatsSleepScreen();
     case (CrossPointSettings::SLEEP_SCREEN_MODE::COVER_CUSTOM):
       if (APP_STATE.lastSleepFromReader) {
         return renderCoverSleepScreen();
@@ -337,5 +343,48 @@ void SleepActivity::renderLastScreenSleepScreen() const {
 
 void SleepActivity::renderBlankSleepScreen() const {
   renderer.clearScreen();
+  renderer.displayBuffer(HalDisplay::HALF_REFRESH);
+}
+
+namespace {
+// Formats an unsigned value with comma thousands separators, e.g. 12345 -> "12,345".
+// out must hold at least 14 bytes (max uint32 "4,294,967,295" + NUL). Falls back to
+// an ungrouped number if the buffer is somehow too small.
+void formatWithThousands(uint32_t value, char* out, size_t outSize) {
+  char digits[11];  // up to 10 digits for uint32_t + NUL
+  const int n = snprintf(digits, sizeof(digits), "%lu", static_cast<unsigned long>(value));
+  if (n <= 0) {
+    if (outSize) out[0] = '\0';
+    return;
+  }
+  const int outLen = n + (n - 1) / 3;  // digits + one comma per group boundary
+  if (static_cast<size_t>(outLen) >= outSize) {
+    snprintf(out, outSize, "%lu", static_cast<unsigned long>(value));
+    return;
+  }
+  int oi = 0;
+  for (int i = 0; i < n; i++) {
+    if (i > 0 && (n - i) % 3 == 0) out[oi++] = ',';
+    out[oi++] = digits[i];
+  }
+  out[oi] = '\0';
+}
+}  // namespace
+
+void SleepActivity::renderStatsSleepScreen() const {
+  const auto pageHeight = renderer.getScreenHeight();
+
+  char numBuf[16];
+  formatWithThousands(READING_STATS.getTotalPagesRead(), numBuf, sizeof(numBuf));
+
+  renderer.clearScreen();
+  renderer.drawCenteredText(NOTOSERIF_14_FONT_ID, pageHeight / 2 - 8, numBuf, true, EpdFontFamily::BOLD);
+  renderer.drawCenteredText(SMALL_FONT_ID, pageHeight / 2 + 22, tr(STR_PAGES_READ), true);
+
+  // Match the default sleep screen: dark background unless the user picked Light.
+  if (SETTINGS.sleepScreen != CrossPointSettings::SLEEP_SCREEN_MODE::LIGHT) {
+    renderer.invertScreen();
+  }
+
   renderer.displayBuffer(HalDisplay::HALF_REFRESH);
 }

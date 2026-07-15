@@ -32,6 +32,7 @@ class CrossPointSettings {
     BLANK = 4,
     COVER_CUSTOM = 5,
     QUICK_RESUME = 6,
+    STATS = 7,  // Sleep screen shows lifetime "pages read" counter
     SLEEP_SCREEN_MODE_COUNT
   };
   enum SLEEP_SCREEN_COVER_MODE { FIT = 0, CROP = 1, SLEEP_SCREEN_COVER_MODE_COUNT };
@@ -271,6 +272,15 @@ class CrossPointSettings {
   uint8_t language = 0;
   // Quick Resume: keep current content visible with moon icon instead of showing a static sleep screen.
   uint8_t quickResumeSleepScreen = QUICK_RESUME_NEVER;
+
+  // Sync-on-wake: on boot, pull new books + a home-screen image from a server on the
+  // user's computer (the CrossPoint dashboard). 0 = off. See src/network/LibrarySync.
+  uint8_t syncOnWake = 0;
+  // Only run sync-on-wake while on USB power, to protect battery. 1 = only when charging.
+  uint8_t syncOnlyWhenCharging = 1;
+  // Full manifest URL the reader pulls from, e.g. "https://<app>.vercel.app/m/<token>" or
+  // "http://192.168.1.50:8765/api/manifest". Scheme optional (defaults to https). Empty = off.
+  char syncServerUrl[128] = "";
 
   ~CrossPointSettings() = default;
 

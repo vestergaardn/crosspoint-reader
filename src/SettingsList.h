@@ -103,10 +103,11 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
   static const std::vector<SettingInfo> baseList = [] {
     std::vector<SettingInfo> v = {
         // --- Display ---
-        SettingInfo::Enum(StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
-                          {StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER,
-                           StrId::STR_COVER_CUSTOM, StrId::STR_NONE_OPT, StrId::STR_QUICK_RESUME},
-                          "sleepScreen", StrId::STR_CAT_DISPLAY),
+        SettingInfo::Enum(
+            StrId::STR_SLEEP_SCREEN, &CrossPointSettings::sleepScreen,
+            {StrId::STR_DARK, StrId::STR_LIGHT, StrId::STR_CUSTOM, StrId::STR_COVER, StrId::STR_COVER_CUSTOM,
+             StrId::STR_NONE_OPT, StrId::STR_QUICK_RESUME, StrId::STR_SLEEP_PAGES_READ},
+            "sleepScreen", StrId::STR_CAT_DISPLAY),
         SettingInfo::Enum(StrId::STR_SLEEP_COVER_MODE, &CrossPointSettings::sleepScreenCoverMode,
                           {StrId::STR_FIT, StrId::STR_CROP}, "sleepScreenCoverMode", StrId::STR_CAT_DISPLAY),
         SettingInfo::Enum(StrId::STR_SLEEP_COVER_FILTER, &CrossPointSettings::sleepScreenCoverFilter,
@@ -193,6 +194,22 @@ inline std::vector<SettingInfo> getSettingsList(const SdCardFontRegistry* regist
                             "removeReadBooksFromRecents", StrId::STR_CAT_SYSTEM),
         SettingInfo::Toggle(StrId::STR_MOVE_FINISHED_TO_READ, &CrossPointSettings::moveFinishedToReadFolder,
                             "moveFinishedToReadFolder", StrId::STR_CAT_SYSTEM),
+
+        // --- Library Sync (sync-on-wake) ---
+        SettingInfo::Toggle(StrId::STR_SYNC_ON_WAKE, &CrossPointSettings::syncOnWake, "syncOnWake",
+                            StrId::STR_CAT_SYSTEM),
+        SettingInfo::Toggle(StrId::STR_SYNC_WHEN_CHARGING, &CrossPointSettings::syncOnlyWhenCharging,
+                            "syncOnlyWhenCharging", StrId::STR_CAT_SYSTEM),
+        // Server URL is a DynamicString (web-configured, like the KOReader server URL) so it is
+        // not shown in the on-device settings tabs — set it from the reader's web Settings page.
+        SettingInfo::DynamicString(
+            StrId::STR_LIBRARY_SYNC_URL, [] { return std::string(SETTINGS.syncServerUrl); },
+            [](const std::string& v) {
+              strncpy(SETTINGS.syncServerUrl, v.c_str(), sizeof(SETTINGS.syncServerUrl) - 1);
+              SETTINGS.syncServerUrl[sizeof(SETTINGS.syncServerUrl) - 1] = '\0';
+              SETTINGS.saveToFile();
+            },
+            "syncServerUrl", StrId::STR_CAT_LIBRARY_SYNC),
 
         // --- KOReader Sync (web-only, uses KOReaderCredentialStore) ---
         SettingInfo::DynamicString(
