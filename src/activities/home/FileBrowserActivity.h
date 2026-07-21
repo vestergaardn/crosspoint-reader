@@ -11,8 +11,9 @@
 
 class FileBrowserActivity final : public Activity {
  public:
-  // Books = standard reader browser; PickFirmware = filter to .bin only and return path via ActivityResult.
-  enum class Mode { Books, PickFirmware };
+  // Books = standard reader browser; PickFirmware = filter to .bin only and return path via ActivityResult;
+  // PickImage = filter to .bmp/.jpg/.png only and return path via ActivityResult.
+  enum class Mode { Books, PickFirmware, PickImage };
 
  private:
   // Deletion

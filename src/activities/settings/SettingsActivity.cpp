@@ -1,5 +1,6 @@
 #include "SettingsActivity.h"
 
+#include <Arduino.h>
 #include <GfxRenderer.h>
 #include <Logging.h>
 
@@ -21,10 +22,12 @@
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
 #include "StatusBarSettingsActivity.h"
+#include "activities/home/FileBrowserActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "activities/util/IntervalSelectionActivity.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/SleepImageUtil.h"
 
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
                                                               StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
@@ -57,6 +60,12 @@ void SettingsActivity::rebuildSettingsLists() {
   }
 
   // Append device-only ACTION items
+  // Insert "Choose Sleep Image" right under the Sleep Screen setting (displaySettings[0]) so the
+  // custom-image workflow is discoverable next to the mode selector.
+  if (!displaySettings.empty()) {
+    displaySettings.insert(displaySettings.begin() + 1,
+                           SettingInfo::Action(StrId::STR_CHOOSE_SLEEP_IMAGE, SettingAction::ChooseSleepImage));
+  }
   controlsSettings.insert(controlsSettings.begin(),
                           SettingInfo::Action(StrId::STR_REMAP_FRONT_BUTTONS, SettingAction::RemapFrontButtons));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_WIFI_NETWORKS, SettingAction::Network));
@@ -295,6 +304,11 @@ void SettingsActivity::toggleCurrentSetting() {
       case SettingAction::Language:
         startActivityForResult(std::make_unique<LanguageSelectActivity>(renderer, mappedInput), resultHandler);
         break;
+      case SettingAction::ChooseSleepImage:
+        startActivityForResult(
+            std::make_unique<FileBrowserActivity>(renderer, mappedInput, "/", FileBrowserActivity::Mode::PickImage),
+            [this](const ActivityResult& result) { onSleepImagePicked(result); });
+        break;
       case SettingAction::None:
         // Do nothing
         break;
@@ -346,6 +360,38 @@ void SettingsActivity::openSleepTimeoutPicker() {
         }
         requestUpdate();
       });
+}
+
+void SettingsActivity::onSleepImagePicked(const ActivityResult& result) {
+  if (result.isCancelled) {
+    requestUpdate();
+    return;
+  }
+
+  const auto* picked = std::get_if<FilePathResult>(&result.data);
+  if (!picked) {
+    LOG_ERR("Settings", "Sleep image picker returned no path");
+    requestUpdate();
+    return;
+  }
+
+  GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
+
+  // Bound converted JPG/PNG to the larger screen dimension so the image looks right in any
+  // orientation while keeping the BMP small and within the renderer's size limits.
+  const int maxDim = std::max(renderer.getScreenWidth(), renderer.getScreenHeight());
+
+  if (installSleepImage(picked->path, maxDim)) {
+    SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
+    SETTINGS.saveToFile();
+    rebuildSettingsLists();
+    GUI.drawPopup(renderer, tr(STR_DONE));
+  } else {
+    GUI.drawPopup(renderer, tr(STR_FAILED_LOWER));
+  }
+
+  delay(1000);
+  requestUpdate();
 }
 
 void SettingsActivity::render(RenderLock&&) {

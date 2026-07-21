@@ -11,6 +11,7 @@
 #include "CrossPointSettings.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
+#include "util/SleepImageUtil.h"
 
 BmpViewerActivity::BmpViewerActivity(GfxRenderer& renderer, MappedInputManager& mappedInput, std::string path)
     : Activity("BmpViewer", renderer, mappedInput), filePath(std::move(path)) {}
@@ -146,25 +147,9 @@ void BmpViewerActivity::onExit() {
 void BmpViewerActivity::doSetSleepCover() {
   GUI.drawPopup(renderer, tr(STR_LOADING_POPUP));
 
-  bool success = false;
-  HalFile inFile, outFile;
-  if (Storage.openFileForRead("BMP", filePath, inFile)) {
-    if (Storage.openFileForWrite("BMP", "/sleep.bmp", outFile)) {
-      char buffer[2048];
-      int bytesRead;
-      success = true;
-      while ((bytesRead = inFile.read(buffer, sizeof(buffer))) > 0) {
-        if (outFile.write(buffer, bytesRead) != bytesRead) {
-          success = false;
-          break;
-        }
-      }
-      outFile.close();
-    }
-    inFile.close();
-  }
-
-  if (success) {
+  // The viewer only opens .bmp files, so this copies verbatim (maxDim is unused for BMP).
+  const int maxDim = std::max(renderer.getScreenWidth(), renderer.getScreenHeight());
+  if (installSleepImage(filePath, maxDim)) {
     SETTINGS.sleepScreen = CrossPointSettings::SLEEP_SCREEN_MODE::CUSTOM;
     SETTINGS.saveToFile();
     GUI.drawPopup(renderer, tr(STR_DONE));
